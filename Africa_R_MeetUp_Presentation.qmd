@@ -1,0 +1,581 @@
+---
+title: "Essentials of Data Wrangling in Data Science Workflow"
+subtitle: "Use Case of Dplyr Package"
+author: "Olumide Oyalola"
+date: "`r Sys.Date()`"
+format: 
+  revealjs:
+    self-contained: false
+    touch: true
+    controls: true
+    chalkboard: true
+    transition: slide
+    background-transition: fade
+    highlight-style: arrow
+    theme: [default, custom.scss]
+    footer: "[iamolumide.quarto.pub/essentials-of-data-wrangling-in-data-science-workflow](https://iamolumide.quarto.pub/essentials-of-data-wrangling-in-data-science-workflow/)"
+    incremental: true
+    smaller: true
+    scrollable: true
+    code-fold: show
+    code-line-numbers: true
+    code-overflow: scroll
+    code-copy: true
+    code-link: true
+    code-tools:
+      source: true
+      toggle: false
+      caption: none
+    citations-hover: true
+    footnotes-hover: true
+editor: visual
+from: markdown+emoji
+highlight-style:
+  light: light.theme
+  dark: dark.theme
+title-slide-attributes:
+    data-background-image: ""
+    data-background-size: contain
+    data-background-opacity: "number"
+---
+
+```{=html}
+<style type="text/css">
+.reveal .slide-logo {
+  bottom: 0;
+  right: 20px;
+  width: 2.0cm;
+  height: 1.6cm
+}
+
+.slide-background:first-child {
+  background-color: #4682B4;
+}
+</style>
+```
+# Data Munging; Let's dive in! {background-color="steelblue" background-opacity="1"}
+
+:point_down:
+
+## Intro {transition="fade-in slide-out"}
+
+-   It is said that around 50% of the data scientist's time goes into transforming raw data into a usable format.
+
+-   Raw data can be in any format or size. It can be structured like RDBMS, semi-structured like CSV, or unstructured like regular text files.
+
+-   These contain some valuable information; and to extract that information, it has to be converted into a data structure or a usable format from which an algorithm can find valuable insights.
+
+-   Therefore, usable format refers to the data in a model that can be consumed in the data science process.
+
+-   This usable format differs from use case to use case.
+
+## Two Perspectives
+
+::: columns
+::: {.column .fragment width="50%"}
+::: {.absolute top="100" left="100"}
+![](images/academics.png){fig-align="left" width="330" height="300"}
+
+```{r}
+#| eval: false
+#| echo: false
+
+library(plotly)
+
+df <- data.frame(
+  group=c("Datasets", "Models and algorithms"),
+  value=c(5, 95)
+)
+
+# Basic piechart
+
+fig <- plot_ly(width = 700, height = 300, data = df, labels = ~group, values = ~value, type = "pie",
+               textinfo = "label+percent",
+               insidetextorientation = "radial") %>% 
+  layout(title = "", showlegend = F)
+
+fig
+
+#embed_notebook(fig)
+
+# ggplot(data, aes(x="", y=value, fill=group)) +
+#   geom_bar(stat="identity", width=1) +
+#   coord_polar("y", start=0) +
+#   theme_void() +
+#   labs(fill = "") +
+#   theme(legend.position = "top") +
+#   scale_fill_brewer(palette = "Set1", direction = 1)
+
+```
+:::
+:::
+
+::: {.column .fragment width="50%"}
+::: {.absolute top="100" right="100"}
+![](images/realWorld.png){fig-align="right" width="400" height="300"}
+:::
+:::
+:::
+
+::: footer
+[Chip Huyen: Designing Machine Learning Systems](https://www.amazon.com/Designing-Machine-Learning-Systems-Production-Ready/dp/1098107969)
+:::
+
+# Typical Data Science Workflow
+
+## 
+
+![](images/vetiver.png){fig-align="center" width="2000"}
+
+::: footer
+[Vetiver](https://vetiver.rstudio.com)
+:::
+
+# What's the problem here? {background-color="steelblue"}
+
+:question:
+
+# Decoupling Objectives {background-color="steelblue"}
+
+# Solution Approach {background-color="steelblue"}
+
+:thought_balloon:
+
+## Data Sourcing Architecture
+
+![](images/data_sourcing.png){fig-align="center"}
+
+## Python Script
+
+``` {.python code-line-numbers="10-25"}
+#| echo: true
+#| eval: false
+#| warning: false
+#| message: false
+#| error: false
+#| output: asis
+
+
+# load modules
+from dotenv import load_dotenv
+import requests
+import json
+import datetime as dt
+import os
+import pandas as pd
+load_dotenv()
+
+# read token from env file
+token = os.environ.get('token')
+
+# setup bearer token
+bearerToken = str('Bearer' + ' ' + '{' + token + '}')
+
+# header authentication
+my_headers = {'Authorization' : bearerToken}
+
+# post request
+response = requests.post('http://46.20.238.167/DataProvider_new/api/v1/vehicle/livepositions',
+headers=my_headers)
+
+# save response body as an object - data
+data = response.json()
+
+if data["message"] == "operation completed successfully":
+    # get the datetime object
+    ct = dt.datetime.now().strftime('%Y-%m-%d %H-%M-%d-%f')
+    # file name
+    name = str('livePosition-' + ct)
+    # file path
+    path = ".\data_parquet"
+    filepath = os.path.join(path, "")
+    # file full path
+    filename = str(filepath + name + ".parquet")
+    df = pd.DataFrame(data.get('result'))
+    df.to_parquet(filename)
+```
+
+## Data Wrangling
+
+```{r}
+#| eval: false
+#| warning: false
+#| message: false
+#| error: false
+#| echo: true
+
+
+#!/usr/bin/env Rscript
+
+
+# Title: Truck Live Position Monitoring
+# File: Parquet_LivePosition-v1.R
+# Project: Prediction of truck arrival time to the source plant
+
+
+# Install pacman package if needed
+if(!require("pacman")) install.packages("pacman")
+
+# load the required packages
+
+pacman::p_load(
+  httr,
+  jsonlite,
+  tidyjson,
+  tidyverse,
+  lubridate,
+  geosphere,
+  anytime,
+  tictoc,
+  stringi,
+  maptools,
+  geosphere,
+  sf,
+  sp,
+  openxlsx,
+  leaflet,
+  magrittr,
+  janitor,
+  arrow,
+  magrittr
+)
+
+options(scipen = 999)
+
+# load parquet files as tibble
+
+tic("Load the parquet files")
+
+df <- list.files("../IbeseLivePosition/data_parquet/",
+                 full.names = TRUE,
+                 include.dirs = TRUE) %>%
+  map_df(~read_parquet(., as_tibble = TRUE))
+
+toc()
+
+# data cleaning
+
+remove <- c("/Date", "(", ")/", "[[:punct:]]")
+
+var <- c("ActualSpeed", "Address", "Altitude", "AssetClass", "AssetLocationID", "AssetStatus", "CategoryID", "CategoryName", "City", "CustomerName", "DateTimeLocal", "DateTimeReceived", "DeliveryOrderNumber", "DepartureDateTime", "DestinationArea", "DestinationCity", "DestinationSite", "DestinationStreet", "DeviceType", "DirectionString", "Distance", "DriverCode", "DriverID", "Geofence", "IgnitionStatus", "Information", "JourneyDistance", "JourneyDuration", "JourneyIdleTime", "JourneyMaxSpeed", "LastIgnitionOff", "LastIgnitionOn", "Latitude", "Load", "Longitude", "NumSatellites", "Odometer", "Reason", "ReasonString", "Reference", "Region", "SiteName", "SpeedOverGround", "Status", "Street", "TrackTrue", "TripDestination", "TripID", "TripSource", "TripType", "UTCDateTime", "WaybillNumber")
+
+
+
+df %<>% 
+  dplyr::select(all_of(var)) %>% 
+  mutate(DateTimeLocal = str_remove_all(DateTimeLocal, 
+                                        paste(remove, collapse = "|")),
+         DateTimeLocal = str_remove_all(DateTimeLocal, 
+                                        "\\+0100|\\+0000"),
+         DateTimeLocal = as.numeric(DateTimeLocal),
+         DateTimeLocal = DateTimeLocal/1000,
+         DateTimeLocal = anytime(DateTimeLocal),
+         DateTimeReceived = str_remove_all(DateTimeReceived, 
+                                           paste(remove, collapse = "|")),
+         DateTimeReceived = str_remove_all(DateTimeReceived, 
+                                           "\\+0100|\\+0000"),
+         DateTimeReceived = as.numeric(DateTimeReceived),
+         DateTimeReceived = DateTimeReceived/1000,
+         DateTimeReceived = anytime(DateTimeReceived),
+         DepartureDateTime = str_remove_all(DepartureDateTime, 
+                                            paste(remove, collapse = "|")),
+         DepartureDateTime = str_remove_all(DepartureDateTime, 
+                                            "\\+0100|\\+0000"),
+         DepartureDateTime = as.numeric(DepartureDateTime),
+         DepartureDateTime = DepartureDateTime/1000,
+         DepartureDateTime = anytime(DepartureDateTime),
+         UTCDateTime = str_remove_all(UTCDateTime, 
+                                      paste(remove, collapse = "|")),
+         UTCDateTime = str_remove_all(UTCDateTime, 
+                                      "\\+0100|\\+0000"),
+         UTCDateTime = as.numeric(UTCDateTime),
+         UTCDateTime = UTCDateTime/1000,
+         UTCDateTime = anytime(UTCDateTime),
+         LastIgnitionOff = str_remove_all(LastIgnitionOff, 
+                                          paste(remove, collapse = "|")),
+         LastIgnitionOff = str_remove_all(LastIgnitionOff, 
+                                          "\\+0100|\\+0000"),
+         LastIgnitionOff = as.numeric(LastIgnitionOff),
+         LastIgnitionOff = LastIgnitionOff/1000,
+         LastIgnitionOff = anytime(LastIgnitionOff),
+         LastIgnitionOn = str_remove_all(LastIgnitionOn, 
+                                         paste(remove, collapse = "|")),
+         LastIgnitionOn = str_remove_all(LastIgnitionOn, 
+                                         "\\+0100|\\+0000"),
+         LastIgnitionOn = as.numeric(LastIgnitionOn),
+         LastIgnitionOn = LastIgnitionOn/1000,
+         LastIgnitionOn = anytime(LastIgnitionOn)) %>% 
+  filter(!between(TripID, 9000000000, Inf)) %>% 
+  filter(!TripID == 0)
+
+df %<>% mutate(TripID = as.numeric(TripID))
+
+ibese <- matrix(c(3.043568,7.006293), ncol = 2)
+
+ibese_geofence <- c("Ibese", "IBESE", "Vehicle Park", "Vehicle Park 2")
+
+
+# inbound truck data warngling steps
+
+inbound_df <- df %>% 
+  filter(AssetStatus == "InService", Longitude > 0, 
+         Latitude > 0) %>% 
+  filter(!between(TripID, 9000000000, Inf)) %>% 
+  filter(TripID != 0) %>% 
+  select(Reference, DateTimeReceived, 
+         Longitude, Latitude, TripID, Geofence, Altitude) %>% 
+  arrange(Reference, DateTimeReceived) %>% 
+  group_by(Reference, TripID) %>% 
+  mutate(.after = DateTimeReceived,
+         TimeDiff = as.numeric(difftime(DateTimeReceived, 
+                                        lag(DateTimeReceived, 
+                                            default = first(DateTimeReceived)), 
+                                        units = "hours")),
+         LongLat = matrix(c(Longitude, Latitude), ncol = 2),
+         DistCovered = distGeo(LongLat, lag(LongLat)),
+         DistCovered = DistCovered/1000,
+         DistToPlant = distGeo(LongLat, ibese),
+         DistToPlant = DistToPlant/1000) %>%
+  mutate(Direction = if_else(lag(DistToPlant) < DistToPlant, "Inbound", "Outbound")) %>% 
+  filter(Direction == "Inbound") %>% 
+  filter(TripID != 3000071349)
+
+
+# spatial data manipulation
+
+geo_proj = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+
+position <- inbound_df %$% 
+  matrix(c(Longitude, Latitude), ncol = 2)
+
+position_sf <- SpatialPoints(position, 
+                             proj4string=CRS(geo_proj)) %>% 
+  st_as_sf()
+
+plant <- matrix(c(3.05120587348938, 7.00300851960855), ncol = 2)
+
+ibese_sp <- SpatialPoints(plant, proj4string=CRS(geo_proj)) %>% 
+  st_as_sf()
+
+plant_buffer <- st_buffer(ibese_sp, 3000)
+
+
+row_id <- st_intersects(plant_buffer, position_sf)[[1]]
+
+
+
+Actual_tbl <- inbound_df %>%
+  ungroup() %>% 
+  .[row_id,] %>% 
+  arrange(TripID, Reference, DateTimeReceived) %>% 
+  group_by(TripID, Reference) %>% 
+  filter(row_number()== 1) %>% 
+  mutate(Date = as.Date(DateTimeReceived)) %>% 
+  select(TripID, Reference, DateTimeReceived, 
+         Longitude, Latitude, Geofence) %>% 
+  mutate(Time = round_date(DateTimeReceived, unit = "hour")) %>% 
+  rename(Arrival = DateTimeReceived) %>% 
+  slice_head(n = 1) %>% 
+  filter(TripID != 3000071349)
+
+
+
+hs <- createStyle(
+  textDecoration = "BOLD", fontColour = "#FFFFFF", fontSize = 12,
+  fontName = "Arial Narrow", fgFill = "#4F80BD"
+)
+
+breaks <- hour(hm("00:00", "6:00", "12:00", "18:00", "23:59"))
+labels <- c("Night", "Morning", "Afternoon", "Evening")
+
+
+
+df %>% 
+  select(-Reason, -DepartureDateTime, -UTCDateTime, -LastIgnitionOff, -LastIgnitionOn, -DateTimeLocal) %>% 
+  mutate(Day = wday(DateTimeReceived, label = TRUE, abbr = TRUE), .after = DateTimeReceived,
+         Month = month(DateTimeReceived, label = TRUE, abbr = TRUE),
+         Hour = hour(DateTimeReceived),
+         TimeOfDay = cut(x= hour(DateTimeReceived), breaks = breaks, labels = labels, include.lowest=TRUE)) %>% 
+  
+  write_csv(., file = "historical-livePosition-data.csv")
+
+
+
+## ML Data
+
+ml_data <- Actual_tbl %>% ungroup() %>% select(TripID, Arrival) %>% 
+  right_join(inbound_df %>% ungroup(), by = "TripID") %>% 
+  select(-LongLat) %>% 
+  mutate(Day = wday(DateTimeReceived, label = TRUE, abbr = TRUE), .after = DateTimeReceived,
+         Month = month(DateTimeReceived, label = TRUE, abbr = TRUE),
+         Hour = hour(DateTimeReceived),
+         TimeOfDay = cut(x= hour(DateTimeReceived), breaks = breaks, 
+                         labels = labels, include.lowest=TRUE)) %>% 
+  filter(DateTimeReceived <= Arrival) %>% 
+  arrange(TripID, Reference, Arrival) %>% 
+  mutate(Duration = as.numeric(Arrival - DateTimeReceived)) %>% 
+  select(-Direction) %>% 
+  filter(Duration <= median(Duration))
+
+
+# write the dataframe as parquet file
+
+ml_data %>% 
+  write_parquet("../IbeseLivePosition/ml_data/ml_data.parquet")
+  
+  
+
+# TODO: identify the inbound trips that are yet to arrive and predict them.
+
+## Inbound trips that are yet to arrive
+
+trips_to_predict <- inbound_df %>% ungroup() %>% 
+  anti_join(Actual_tbl %>% ungroup() %>% select(TripID), by = "TripID") %>% 
+  select(-LongLat) %>% 
+  mutate(Day = wday(DateTimeReceived, label = TRUE, abbr = TRUE), .after = DateTimeReceived,
+         Month = month(DateTimeReceived, label = TRUE, abbr = TRUE),
+         Hour = hour(DateTimeReceived),
+         TimeOfDay = cut(x= hour(DateTimeReceived), breaks = breaks, labels = labels, include.lowest=TRUE)) %>% 
+  select(-Direction) 
+
+
+trips_to_predict %>% 
+  write_parquet("../IbeseLivePosition/ml_data/trips_to_predict.parquet")
+
+```
+
+# Modeling {background-color="steelblue"}
+
+------------------------------------------------------------------------
+
+> ## A group of smart people have the ability to take better decisions than a single individual, especially when each group member comes in with their own biases. The ideology is also true for machine learning.
+
+## Stack Ensemble Machine Learning Model
+
+![](images/stack_stones.jpg){fig-align="center"}
+
+::: footer
+Photo by [lamoix](https://flickr.com/photos/lamoix/3757737766/)
+
+[Getting Started With Stacks\|Tidymodels Approach](https://stacks.tidymodels.org/articles/basics.html)
+:::
+
+## Why is a collection of models often better than a single model?
+
+-   If we consider each model as a sort of `expert` on a target prediction task, we can think of an **ensemble** as a collection of experts.
+
+-   Instead of just asking one expert, we can find a group of experts and somehow combine their predictions.
+
+-   Moreover, ensemble models are very good in avoiding *underfitting* and *overfitting*.
+
+::: notes
+# When might we expect ensembles to improve our performance?
+
+-   Certainly, if each expert knew exactly the same things, they would give the same predictions, and the ensemble would provide no advantage.
+
+-   On the other hand, if each expert was knowledgeable in a slightly different aspect of the problem, they might give complementary predictions, and the whole group might provide more information than any individual expert.
+:::
+
+# Model Performance {background-color="steelblue"}
+
+```{r}
+#| echo: false
+
+if(!require(pacman)) install.packages("pacman")
+
+pacman::p_load(
+  arrow,
+  tidymodels,
+  bonsai,
+  modeltime,
+  tidyverse,
+  stacks,
+  tictoc,
+  vetiver,
+  pins,
+  lubridate,
+  plumber,
+  openxlsx,
+  DALEX,
+  DALEXtra
+)
+
+tidymodels_prefer()
+options(scipen = 999)
+
+
+tbl <- read_parquet("../IbeseLivePosition/ml_data/ml_data.parquet", as_tibble = TRUE)
+
+set.seed(1234)
+trip_split <- initial_split(tbl,
+                            prop = 0.75,
+                            strata = "Duration")
+
+trip_train <- trip_split %>% 
+  training()
+
+trip_test <- trip_split %>% 
+  testing()
+
+b <- board_folder(path = "pins-r")
+
+# v_0eafc <- vetiver_pin_read(board = b, name = "dcp_ibese_truck_arrival", version = "20220905T121845Z-0eafc")
+
+v_f61c5 <- vetiver_pin_read(board = b, name = "dcp_ibese_truck_arrival", version = "20220909T103151Z-f61c5")
+
+v_20a01 <- vetiver_pin_read(board = b, name = "dcp_ibese_truck_arrival", version = "20220902T135603Z-20a01")
+
+
+test_model_f61c5 <- 
+  trip_test %>% 
+  bind_cols(predict(v_f61c5, .))
+
+test_model_20a01 <- 
+  trip_test %>% 
+  bind_cols(predict(v_20a01, .))
+
+member_preds1 <- 
+  test_model_f61c5 %>% 
+  select(Duration) %>% 
+  bind_cols(predict(v_f61c5, test_model_f61c5, members = TRUE)) %>% 
+  rename(stackedModels = `.pred`)
+
+member_preds2 <- 
+  test_model_20a01 %>% 
+  select(Duration) %>% 
+  bind_cols(predict(v_20a01, test_model_20a01, members = TRUE)) %>% 
+  rename(stackedModels = `.pred`)
+```
+
+## Metrics
+
+::: panel-tabset \### `rmse`
+
+```{r}
+#| echo: false
+#| comment: ""
+
+map_dfr(member_preds1, rmse, truth = Duration, data = member_preds1) %>%
+  mutate(member = colnames(member_preds1)) %>% 
+  DT::datatable(.)
+
+# map_dfr(member_preds2, rmse, truth = Duration, data = member_preds2) %>%
+#   mutate(member = colnames(member_preds2))
+
+```
+
+### `rsq`
+
+```{r}
+#| echo: false
+#| comment: ""
+
+map_dfr(member_preds1, rsq, truth = Duration, data = member_preds1) %>%
+  mutate(member = colnames(member_preds1)) %>% 
+  DT::datatable(.)
+
+# map_dfr(member_preds2, rsq, truth = Duration, data = member_preds2) %>%
+#   mutate(member = colnames(member_preds2))
+```
+

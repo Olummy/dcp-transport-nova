@@ -1,0 +1,171 @@
+---
+title: "Transport Analytics"
+subtitle: "Data source: Live Position Data | H2o Implementation"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    anchor_sections: yes
+    code_folding: hide
+    code_download: yes
+    highlight: kate
+    theme: journal
+    number_sections: yes
+    fig_width: 9
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+# Preambles
+
+## Load packages
+
+
+```{r load-libraries}
+
+if(!require(pacman)) install.packages("pacman")
+
+pacman::p_load(
+  arrow,
+  rsample,
+  tidyverse,
+  tictoc,
+  vetiver,
+  pins,
+  lubridate,
+  h2o
+)
+
+tidymodels_prefer()
+h2o.init(min_mem_size = "2g")
+options(scipen = 999)
+```
+
+
+## Load dataset
+
+```{r read-data, cache=TRUE}
+
+tbl_hf <- h2o.importFile("../IbeseLivePosition/ml_data/ml_data.parquet")
+
+```
+
+
+
+
+## Data Partitioning
+
+
+```{r data-split}
+
+
+trip_split <- h2o.splitFrame(tbl_hf, ratios = 0.75, seed = 1)
+
+train <- trip_split[[1]]
+
+test <- trip_split[[2]]
+
+
+y <- "Duration"
+X <- setdiff(names(train), y)
+X <- X[c(5:13, 15)]
+
+# cv
+
+nfolds <- 10
+
+```
+
+
+
+# AutoML
+
+```{r}
+all_models <- h2o.automl(x = X,
+                         y = y,
+                         training_frame = train,
+                         nfolds = nfolds,
+                        distribution = "AUTO",
+                        stopping_metric = "RMSE",
+                        seed = 1,
+                        project_name = "trip1")
+```
+
+
+## Leaderboard
+
+```{r}
+lb <- h2o.get_leaderboard(all_models, extra_columns = 'algo')
+
+lb
+```
+
+
+
+# Generate Ensemble Models
+
+```{r}
+
+# Train & cross-validate a GBM:
+my_gbm <- h2o.gbm(x = X,
+                  y = y,
+                  training_frame = train,
+                  distribution = "AUTO",
+                  ntrees = 100,
+                  max_depth = 10,
+                  min_rows = 2,
+                  learn_rate = 0.2,
+                  nfolds = nfolds,
+                  keep_cross_validation_predictions = TRUE,
+                  seed = 1)
+
+# Train & cross-validate a RF:
+
+my_rf <- h2o.randomForest(x = X,
+                          y = y,
+                          training_frame = train,
+                          ntrees = 100,
+                          nfolds = nfolds,
+                          keep_cross_validation_predictions = TRUE,
+                          seed = 1)
+
+
+# Train & cross validate a DeepLearning:
+
+my_dlearning <- h2o.deeplearning(x = X,
+                                 y = y,
+                                 training_frame = train,
+                                 nfolds = nfolds,
+                                 keep_cross_validation_predictions = TRUE,
+                                 seed = 1,
+                                 epochs = 10)
+# Train a stacked ensemble using the GBM and RF above:
+
+ensemble <- h2o.stackedEnsemble(x = X,
+                                y = y,
+                                training_frame = train,
+                                base_models = list(my_gbm, 
+                                                   my_rf,
+                                                   my_dlearning))
+
+```
+
+***
+
+# Eval the ensemble performance on a test set
+
+```{r}
+perf <- h2o.performance(ensemble, newdata = test)
+
+ensemble_rmse_test <- h2o.rmse(perf)
+```
+
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
+

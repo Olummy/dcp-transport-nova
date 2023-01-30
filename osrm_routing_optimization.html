@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.0.37">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Olumide Oyalola">
+
+<title>Spatial Optimazation with OSRM</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+span.underline{text-decoration: underline;}
+div.column{display: inline-block; vertical-align: top; width: 50%;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+    color: #aaaaaa;
+  }
+pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+code span.at { color: #7d9029; } /* Attribute */
+code span.bn { color: #40a070; } /* BaseN */
+code span.bu { } /* BuiltIn */
+code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+code span.ch { color: #4070a0; } /* Char */
+code span.cn { color: #880000; } /* Constant */
+code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+code span.dt { color: #902000; } /* DataType */
+code span.dv { color: #40a070; } /* DecVal */
+code span.er { color: #ff0000; font-weight: bold; } /* Error */
+code span.ex { } /* Extension */
+code span.fl { color: #40a070; } /* Float */
+code span.fu { color: #06287e; } /* Function */
+code span.im { } /* Import */
+code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+code span.op { color: #666666; } /* Operator */
+code span.ot { color: #007020; } /* Other */
+code span.pp { color: #bc7a00; } /* Preprocessor */
+code span.sc { color: #4070a0; } /* SpecialChar */
+code span.ss { color: #bb6688; } /* SpecialString */
+code span.st { color: #4070a0; } /* String */
+code span.va { color: #19177c; } /* Variable */
+code span.vs { color: #4070a0; } /* VerbatimString */
+code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+</style>
+
+
+<script src="osrm_routing_optimization_files/libs/clipboard/clipboard.min.js"></script>
+<script src="osrm_routing_optimization_files/libs/quarto-html/quarto.js"></script>
+<script src="osrm_routing_optimization_files/libs/quarto-html/popper.min.js"></script>
+<script src="osrm_routing_optimization_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="osrm_routing_optimization_files/libs/quarto-html/anchor.min.js"></script>
+<link href="osrm_routing_optimization_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="osrm_routing_optimization_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="osrm_routing_optimization_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="osrm_routing_optimization_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="osrm_routing_optimization_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script src="osrm_routing_optimization_files/libs/htmlwidgets-1.5.4/htmlwidgets.js"></script>
+<script src="osrm_routing_optimization_files/libs/jquery-1.12.4/jquery.min.js"></script>
+<link href="osrm_routing_optimization_files/libs/leaflet-1.3.1/leaflet.css" rel="stylesheet">
+<script src="osrm_routing_optimization_files/libs/leaflet-1.3.1/leaflet.js"></script>
+<link href="osrm_routing_optimization_files/libs/leafletfix-1.0.0/leafletfix.css" rel="stylesheet">
+<script src="osrm_routing_optimization_files/libs/proj4-2.6.2/proj4.min.js"></script>
+<script src="osrm_routing_optimization_files/libs/Proj4Leaflet-1.0.1/proj4leaflet.js"></script>
+<link href="osrm_routing_optimization_files/libs/rstudio_leaflet-1.3.1/rstudio_leaflet.css" rel="stylesheet">
+<script src="osrm_routing_optimization_files/libs/leaflet-binding-2.1.1/leaflet.js"></script>
+
+
+</head>
+
+<body>
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+<div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+  <nav id="TOC" role="doc-toc">
+    <h2 id="toc-title">Content</h2>
+   
+  <ul>
+  <li><a href="#load-the-required-packages" id="toc-load-the-required-packages" class="nav-link active" data-scroll-target="#load-the-required-packages">Load the required packages</a></li>
+  <li><a href="#load-parquet-files-as-tibble" id="toc-load-parquet-files-as-tibble" class="nav-link" data-scroll-target="#load-parquet-files-as-tibble">Load parquet files as tibble</a></li>
+  <li><a href="#data-wrangling" id="toc-data-wrangling" class="nav-link" data-scroll-target="#data-wrangling">Data Wrangling</a></li>
+  <li><a href="#calculate-the-optimal-trip" id="toc-calculate-the-optimal-trip" class="nav-link" data-scroll-target="#calculate-the-optimal-trip">Calculate the optimal trip</a></li>
+  </ul>
+</nav>
+</div>
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Spatial Optimazation with OSRM</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Olumide Oyalola </p>
+          </div>
+  </div>
+    
+    
+  </div>
+  
+
+</header>
+
+<section id="load-the-required-packages" class="level1">
+<h1>Load the required packages</h1>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="cf">if</span>(<span class="sc">!</span><span class="fu">require</span>(<span class="st">"pacman"</span>)) <span class="fu">install.packages</span>(<span class="st">"pacman"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>Loading required package: pacman</code></pre>
+</div>
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>pacman<span class="sc">::</span><span class="fu">p_load</span>(</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  httr,</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>  jsonlite,</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>  tidyjson,</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  tidyverse,</span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>  lubridate,</span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>  geosphere,</span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>  anytime,</span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>  tictoc,</span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>  stringi,</span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>  maptools,</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>  geosphere,</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a>  sf,</span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>  sp,</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  openxlsx,</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>  leaflet,</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>  magrittr,</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  janitor,</span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>  arrow,</span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>  magrittr,</span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>  osrm,</span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>  leaflet</span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="load-parquet-files-as-tibble" class="level1">
+<h1>Load parquet files as tibble</h1>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">tic</span>(<span class="st">"Load the parquet files"</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>df <span class="ot">&lt;-</span> <span class="fu">list.files</span>(<span class="st">"../IbeseLivePosition/data_parquet/"</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>                 <span class="at">full.names =</span> <span class="cn">TRUE</span>,</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>                 <span class="at">include.dirs =</span> <span class="cn">TRUE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tail</span>(., <span class="dv">300</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">map_df</span>(<span class="sc">~</span><span class="fu">read_parquet</span>(., <span class="at">as_tibble =</span> <span class="cn">TRUE</span>))</span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="fu">toc</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stdout">
+<pre><code>Load the parquet files: 39.5 sec elapsed</code></pre>
+</div>
+</div>
+</section>
+<section id="data-wrangling" class="level1">
+<h1>Data Wrangling</h1>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>remove <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"/Date"</span>, <span class="st">"("</span>, <span class="st">")/"</span>, <span class="st">"[[:punct:]]"</span>)</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>var <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"ActualSpeed"</span>, <span class="st">"Address"</span>, <span class="st">"Altitude"</span>, <span class="st">"AssetClass"</span>, <span class="st">"AssetLocationID"</span>, <span class="st">"AssetStatus"</span>, <span class="st">"CategoryID"</span>, <span class="st">"CategoryName"</span>, <span class="st">"City"</span>, <span class="st">"CustomerName"</span>, <span class="st">"DateTimeLocal"</span>, <span class="st">"DateTimeReceived"</span>, <span class="st">"DeliveryOrderNumber"</span>, <span class="st">"DepartureDateTime"</span>, <span class="st">"DestinationArea"</span>, <span class="st">"DestinationCity"</span>, <span class="st">"DestinationSite"</span>, <span class="st">"DestinationStreet"</span>, <span class="st">"DeviceType"</span>, <span class="st">"DirectionString"</span>, <span class="st">"Distance"</span>, <span class="st">"DriverCode"</span>, <span class="st">"DriverID"</span>, <span class="st">"Geofence"</span>, <span class="st">"IgnitionStatus"</span>, <span class="st">"Information"</span>, <span class="st">"JourneyDistance"</span>, <span class="st">"JourneyDuration"</span>, <span class="st">"JourneyIdleTime"</span>, <span class="st">"JourneyMaxSpeed"</span>, <span class="st">"LastIgnitionOff"</span>, <span class="st">"LastIgnitionOn"</span>, <span class="st">"Latitude"</span>, <span class="st">"Load"</span>, <span class="st">"Longitude"</span>, <span class="st">"NumSatellites"</span>, <span class="st">"Odometer"</span>, <span class="st">"Reason"</span>, <span class="st">"ReasonString"</span>, <span class="st">"Reference"</span>, <span class="st">"Region"</span>, <span class="st">"SiteName"</span>, <span class="st">"SpeedOverGround"</span>, <span class="st">"Status"</span>, <span class="st">"Street"</span>, <span class="st">"TrackTrue"</span>, <span class="st">"TripDestination"</span>, <span class="st">"TripID"</span>, <span class="st">"TripSource"</span>, <span class="st">"TripType"</span>, <span class="st">"UTCDateTime"</span>, <span class="st">"WaybillNumber"</span>)</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>df <span class="sc">%&lt;&gt;%</span> </span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="fu">all_of</span>(var)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">DateTimeLocal =</span> <span class="fu">str_remove_all</span>(DateTimeLocal, </span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>                                        <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeLocal =</span> <span class="fu">str_remove_all</span>(DateTimeLocal, </span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>                                        <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeLocal =</span> <span class="fu">as.numeric</span>(DateTimeLocal),</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeLocal =</span> DateTimeLocal<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeLocal =</span> <span class="fu">anytime</span>(DateTimeLocal),</span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeReceived =</span> <span class="fu">str_remove_all</span>(DateTimeReceived, </span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>                                           <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeReceived =</span> <span class="fu">str_remove_all</span>(DateTimeReceived, </span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>                                           <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeReceived =</span> <span class="fu">as.numeric</span>(DateTimeReceived),</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeReceived =</span> DateTimeReceived<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>         <span class="at">DateTimeReceived =</span> <span class="fu">anytime</span>(DateTimeReceived),</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>         <span class="at">DepartureDateTime =</span> <span class="fu">str_remove_all</span>(DepartureDateTime, </span>
+<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a>                                            <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a>         <span class="at">DepartureDateTime =</span> <span class="fu">str_remove_all</span>(DepartureDateTime, </span>
+<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>                                            <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>         <span class="at">DepartureDateTime =</span> <span class="fu">as.numeric</span>(DepartureDateTime),</span>
+<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>         <span class="at">DepartureDateTime =</span> DepartureDateTime<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>         <span class="at">DepartureDateTime =</span> <span class="fu">anytime</span>(DepartureDateTime),</span>
+<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>         <span class="at">UTCDateTime =</span> <span class="fu">str_remove_all</span>(UTCDateTime, </span>
+<span id="cb6-31"><a href="#cb6-31" aria-hidden="true" tabindex="-1"></a>                                      <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-32"><a href="#cb6-32" aria-hidden="true" tabindex="-1"></a>         <span class="at">UTCDateTime =</span> <span class="fu">str_remove_all</span>(UTCDateTime, </span>
+<span id="cb6-33"><a href="#cb6-33" aria-hidden="true" tabindex="-1"></a>                                      <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-34"><a href="#cb6-34" aria-hidden="true" tabindex="-1"></a>         <span class="at">UTCDateTime =</span> <span class="fu">as.numeric</span>(UTCDateTime),</span>
+<span id="cb6-35"><a href="#cb6-35" aria-hidden="true" tabindex="-1"></a>         <span class="at">UTCDateTime =</span> UTCDateTime<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-36"><a href="#cb6-36" aria-hidden="true" tabindex="-1"></a>         <span class="at">UTCDateTime =</span> <span class="fu">anytime</span>(UTCDateTime),</span>
+<span id="cb6-37"><a href="#cb6-37" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOff =</span> <span class="fu">str_remove_all</span>(LastIgnitionOff, </span>
+<span id="cb6-38"><a href="#cb6-38" aria-hidden="true" tabindex="-1"></a>                                          <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-39"><a href="#cb6-39" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOff =</span> <span class="fu">str_remove_all</span>(LastIgnitionOff, </span>
+<span id="cb6-40"><a href="#cb6-40" aria-hidden="true" tabindex="-1"></a>                                          <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-41"><a href="#cb6-41" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOff =</span> <span class="fu">as.numeric</span>(LastIgnitionOff),</span>
+<span id="cb6-42"><a href="#cb6-42" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOff =</span> LastIgnitionOff<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-43"><a href="#cb6-43" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOff =</span> <span class="fu">anytime</span>(LastIgnitionOff),</span>
+<span id="cb6-44"><a href="#cb6-44" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOn =</span> <span class="fu">str_remove_all</span>(LastIgnitionOn, </span>
+<span id="cb6-45"><a href="#cb6-45" aria-hidden="true" tabindex="-1"></a>                                         <span class="fu">paste</span>(remove, <span class="at">collapse =</span> <span class="st">"|"</span>)),</span>
+<span id="cb6-46"><a href="#cb6-46" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOn =</span> <span class="fu">str_remove_all</span>(LastIgnitionOn, </span>
+<span id="cb6-47"><a href="#cb6-47" aria-hidden="true" tabindex="-1"></a>                                         <span class="st">"</span><span class="sc">\\</span><span class="st">+0100|</span><span class="sc">\\</span><span class="st">+0000"</span>),</span>
+<span id="cb6-48"><a href="#cb6-48" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOn =</span> <span class="fu">as.numeric</span>(LastIgnitionOn),</span>
+<span id="cb6-49"><a href="#cb6-49" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOn =</span> LastIgnitionOn<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb6-50"><a href="#cb6-50" aria-hidden="true" tabindex="-1"></a>         <span class="at">LastIgnitionOn =</span> <span class="fu">anytime</span>(LastIgnitionOn)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-51"><a href="#cb6-51" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">between</span>(TripID, <span class="dv">9000000000</span>, <span class="cn">Inf</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb6-52"><a href="#cb6-52" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span>TripID <span class="sc">==</span> <span class="dv">0</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: between() called on numeric vector with S3 class</code></pre>
+</div>
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>df <span class="sc">%&lt;&gt;%</span> <span class="fu">mutate</span>(<span class="at">TripID =</span> <span class="fu">as.numeric</span>(TripID))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="fu">options</span>(<span class="at">scipen =</span> <span class="dv">999</span>)</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>ibese_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(<span class="at">id =</span> <span class="st">"ibese"</span>, <span class="at">lon =</span> <span class="fu">c</span>(<span class="fl">3.043568</span>), <span class="at">lat =</span> <span class="fu">c</span>(<span class="fl">7.006293</span>))</span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>ibese <span class="ot">&lt;-</span> <span class="fu">matrix</span>(<span class="fu">c</span>(<span class="fl">3.043568</span>,<span class="fl">7.006293</span>), <span class="at">ncol =</span> <span class="dv">2</span>)</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>ibese_geofence <span class="ot">&lt;-</span> <span class="fu">c</span>(<span class="st">"Ibese"</span>, <span class="st">"IBESE"</span>, <span class="st">"Vehicle Park"</span>, <span class="st">"Vehicle Park 2"</span>)</span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>inbound_df <span class="ot">&lt;-</span> df <span class="sc">%&gt;%</span> </span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(AssetStatus <span class="sc">==</span> <span class="st">"InService"</span>, Longitude <span class="sc">&gt;</span> <span class="dv">0</span>, </span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>         Latitude <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">between</span>(TripID, <span class="dv">9000000000</span>, <span class="cn">Inf</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(TripID <span class="sc">!=</span> <span class="dv">0</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(Reference, DateTimeReceived, </span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>         Longitude, Latitude, TripID, Geofence, Altitude) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(Reference, DateTimeReceived) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-19"><a href="#cb9-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(Reference, TripID) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-20"><a href="#cb9-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">.after =</span> DateTimeReceived,</span>
+<span id="cb9-21"><a href="#cb9-21" aria-hidden="true" tabindex="-1"></a>         <span class="at">TimeDiff =</span> <span class="fu">as.numeric</span>(<span class="fu">difftime</span>(DateTimeReceived, </span>
+<span id="cb9-22"><a href="#cb9-22" aria-hidden="true" tabindex="-1"></a>                                        <span class="fu">lag</span>(DateTimeReceived, </span>
+<span id="cb9-23"><a href="#cb9-23" aria-hidden="true" tabindex="-1"></a>                                            <span class="at">default =</span> <span class="fu">first</span>(DateTimeReceived)), </span>
+<span id="cb9-24"><a href="#cb9-24" aria-hidden="true" tabindex="-1"></a>                                        <span class="at">units =</span> <span class="st">"hours"</span>)),</span>
+<span id="cb9-25"><a href="#cb9-25" aria-hidden="true" tabindex="-1"></a>         <span class="at">LongLat =</span> <span class="fu">matrix</span>(<span class="fu">c</span>(Longitude, Latitude), <span class="at">ncol =</span> <span class="dv">2</span>),</span>
+<span id="cb9-26"><a href="#cb9-26" aria-hidden="true" tabindex="-1"></a>         <span class="at">DistCovered =</span> <span class="fu">distGeo</span>(LongLat, <span class="fu">lag</span>(LongLat)),</span>
+<span id="cb9-27"><a href="#cb9-27" aria-hidden="true" tabindex="-1"></a>         <span class="at">DistCovered =</span> DistCovered<span class="sc">/</span><span class="dv">1000</span>,</span>
+<span id="cb9-28"><a href="#cb9-28" aria-hidden="true" tabindex="-1"></a>         <span class="at">DistToPlant =</span> <span class="fu">distGeo</span>(LongLat, ibese),</span>
+<span id="cb9-29"><a href="#cb9-29" aria-hidden="true" tabindex="-1"></a>         <span class="at">DistToPlant =</span> DistToPlant<span class="sc">/</span><span class="dv">1000</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb9-30"><a href="#cb9-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Direction =</span> <span class="fu">if_else</span>(<span class="fu">lag</span>(DistToPlant) <span class="sc">&lt;</span> DistToPlant, <span class="st">"Inbound"</span>, <span class="st">"Outbound"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-31"><a href="#cb9-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(Direction <span class="sc">==</span> <span class="st">"Inbound"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-32"><a href="#cb9-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_tail</span>(<span class="at">n =</span> <span class="dv">1</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-33"><a href="#cb9-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(TripID <span class="sc">!=</span> <span class="dv">3000071349</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+</section>
+<section id="calculate-the-optimal-trip" class="level1">
+<h1>Calculate the optimal trip</h1>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>inbound <span class="ot">&lt;-</span> inbound_df <span class="sc">%&gt;%</span> </span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(TripID, Longitude, Latitude) <span class="sc">%&gt;%</span> </span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">rename</span>(<span class="at">lon =</span> Longitude,</span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a>         <span class="at">lat =</span> Latitude) <span class="sc">%&gt;%</span> </span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">slice_head</span>(<span class="at">n =</span> <span class="dv">10</span>)</span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>trips <span class="ot">&lt;-</span> <span class="fu">osrmTrip</span>(inbound, <span class="at">osrm.profile =</span> <span class="st">"car"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+</div>
+<div class="cell">
+<details open="">
+<summary>Code</summary>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>trip_sp <span class="ot">&lt;-</span> trips[[<span class="dv">1</span>]]<span class="sc">$</span>trip</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-3"><a href="#cb11-3" aria-hidden="true" tabindex="-1"></a><span class="co"># Plot with leaflet</span></span>
+<span id="cb11-4"><a href="#cb11-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb11-5"><a href="#cb11-5" aria-hidden="true" tabindex="-1"></a><span class="fu">leaflet</span>(<span class="at">data =</span> trip_sp) <span class="sc">%&gt;%</span> </span>
+<span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addTiles</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addMarkers</span>(<span class="at">lng =</span> inbound<span class="sc">$</span>lon, <span class="at">lat =</span> inbound<span class="sc">$</span>lat, <span class="at">popup =</span> inbound<span class="sc">$</span>TripID) <span class="sc">%&gt;%</span> </span>
+<span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">addPolylines</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</details>
+<div class="cell-output-display">
+<div id="htmlwidget-f8fe8b417df519685b18" style="width:100%;height:464px;" class="leaflet html-widget"></div>
+<script type="application/json" data-for="htmlwidget-f8fe8b417df519685b18">{"x":{"options":{"crs":{"crsClass":"L.CRS.EPSG3857","code":null,"proj4def":null,"projectedBounds":null,"options":{}}},"calls":[{"method":"addTiles","args":["https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",null,null,{"minZoom":0,"maxZoom":18,"tileSize":256,"subdomains":"abc","errorTileUrl":"","tms":false,"noWrap":false,"zoomOffset":0,"zoomReverse":false,"opacity":1,"zIndex":1,"detectRetina":false,"attribution":"&copy; <a href=\"https://openstreetmap.org\">OpenStreetMap<\/a> contributors, <a href=\"https://creativecommons.org/licenses/by-sa/2.0/\">CC-BY-SA<\/a>"}]},{"method":"addMarkers","args":[[6.9972753,6.9982635,7.2649486,7.397947,7.4025,6.997634,6.9971676,6.9969968,7.0210061,7.4794041],[3.0475805,3.0462845,3.8334371,3.797879,3.853577,3.048131,3.0477501,3.0477898,3.0424321,3.8393561],null,null,null,{"interactive":true,"draggable":false,"keyboard":true,"title":"","alt":"","zIndexOffset":0,"opacity":1,"riseOnHover":false,"riseOffset":250},[3000509382,3000512398,3000510976,3000511747,3000512210,3100340049,3100340677,3000511257,3100340156,3100340577],null,null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]},{"method":"addPolylines","args":[[[[{"lng":[3.047097,3.047263],"lat":[6.997977,6.998147]}]],[[{"lng":[3.047263,3.046303],"lat":[6.998147,6.998214]}]],[[{"lng":[3.046303,3.041191,3.042546],"lat":[6.998214,7.007625,7.021066]}]],[[{"lng":[3.042546,3.040273,3.052174,3.054607,3.099539,3.250479,3.307732,3.325459,3.346791,3.358858,3.458663,3.475527,3.486695,3.527427,3.615401,3.613743,3.632695,3.673583,3.691825,3.697884,3.705969,3.732066,3.771776,3.781661,3.797911],"lat":[7.021066,7.027993,7.034193,7.049265,7.090182,7.140181,7.13534,7.155637,7.154544,7.169185,7.194132,7.205583,7.225452,7.232022,7.300591,7.311252,7.322981,7.383052,7.385991,7.394693,7.396221,7.385887,7.401636,7.395796,7.397869]}]],[[{"lng":[3.797911,3.806142,3.827005,3.858776,3.873476,3.89044,3.898594,3.893071,3.879135,3.875372,3.851581,3.839342],"lat":[7.397869,7.398645,7.383546,7.377481,7.383603,7.400896,7.423352,7.428249,7.427277,7.448459,7.45459,7.479385]}]],[[{"lng":[3.839342,3.851581,3.875372,3.879035,3.883615,3.878124,3.859055,3.871171,3.853562],"lat":[7.479385,7.45459,7.448459,7.427472,7.426561,7.420461,7.419653,7.397277,7.402472]}]],[[{"lng":[3.853562,3.878801,3.889045,3.877307,3.865244,3.833178],"lat":[7.402472,7.390091,7.358828,7.34561,7.288489,7.265829]}]],[[{"lng":[3.833178,3.839558,3.832892,3.81403,3.804223,3.788018,3.769654,3.759763,3.71866,3.710833,3.686374,3.622409,3.59696,3.565267,3.544408,3.429952,3.402233,3.367255,3.342817,3.325735,3.308391,3.250907,3.098145,3.054607,3.052174,3.040273,3.046843],"lat":[7.265829,7.266819,7.252039,7.233694,7.197125,7.170637,7.15506,7.129422,7.107069,7.106384,7.12095,7.118768,7.112449,7.119508,7.130534,7.142919,7.139777,7.145349,7.156745,7.155782,7.135698,7.140405,7.08949,7.049265,7.034193,7.027993,6.996801]}]],[[{"lng":[3.046843,3.04685],"lat":[6.996801,6.996784]}]],[[{"lng":[3.04685,3.047097],"lat":[6.996784,6.997977]}]]],null,null,{"interactive":true,"className":"","stroke":true,"color":"#03F","weight":5,"opacity":0.5,"fill":false,"fillColor":"#03F","fillOpacity":0.2,"smoothFactor":1,"noClip":false},null,null,null,{"interactive":false,"permanent":false,"direction":"auto","opacity":1,"offset":[0,0],"textsize":"10px","textOnly":false,"className":"","sticky":true},null]}],"limits":{"lat":[6.996784,7.4794041],"lng":[3.040273,3.898594]}},"evals":[],"jsHooks":[]}</script>
+</div>
+</div>
+<p>duration &lt;- osrmTable(src = inbound_df %&gt;% ungroup() %&gt;% filter(as.Date(DateTimeReceived) == today()) %&gt;% select(TripID, Longitude, Latitude) %&gt;% slice_head(n = 100), dst = ibese_df, measure = “duration”, osrm.profile = “car”)</p>
+<hr>
+<p>distance &lt;- osrmTable(src = inbound_df %&gt;% ungroup() %&gt;% filter(as.Date(DateTimeReceived) == today()) %&gt;% select(TripID, Longitude, Latitude) %&gt;% slice_head(n = 100), dst = ibese_df, measure = “distance”, osrm.profile = “car”)</p>
+<hr>
+<p>distances &lt;- distance$distances %&gt;% as.data.frame() %&gt;% rownames_to_column() %&gt;% rename(TripID = rowname, Distance = ibese) %&gt;% mutate(TripID = as.numeric(TripID))</p>
+<hr>
+<p>durations &lt;- duration$durations %&gt;% as.data.frame() %&gt;% rownames_to_column() %&gt;% rename(TripID = rowname, duration = ibese) %&gt;% mutate(TripID = as.numeric(TripID))</p>
+<hr>
+<p>arrival &lt;- inbound_df %&gt;% ungroup() %&gt;% inner_join(durations, by = ‘TripID’) %&gt;% inner_join(distances, by = ‘TripID’) %&gt;% mutate(Arrival = DateTimeReceived + minutes(round(duration))) %&gt;% select(TripID, Reference, Longitude, Latitude, Distance, DateTimeReceived, Arrival) %&gt;% arrange(Distance)</p>
+<hr>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    target: function(trigger) {
+      return trigger.previousElementSibling;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    setTimeout(function() {
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      let href = ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const cites = ref.parentNode.getAttribute('data-cites').split(' ');
+    tippyHover(ref, function() {
+      var popup = window.document.createElement('div');
+      cites.forEach(function(cite) {
+        var citeDiv = window.document.createElement('div');
+        citeDiv.classList.add('hanging-indent');
+        citeDiv.classList.add('csl-entry');
+        var biblioDiv = window.document.getElementById('ref-' + cite);
+        if (biblioDiv) {
+          citeDiv.innerHTML = biblioDiv.innerHTML;
+        }
+        popup.appendChild(citeDiv);
+      });
+      return popup.innerHTML;
+    });
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>

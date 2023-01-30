@@ -1,0 +1,666 @@
+---
+title: "Transport Analytics"
+subtitle: "Data source: Live Position Data"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    anchor_sections: yes
+    code_folding: hide
+    code_download: yes
+    highlight: kate
+    theme: journal
+    number_sections: yes
+    fig_width: 9
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+
+# Preambles
+
+## Load packages
+
+
+```{r load-libraries}
+
+if(!require(pacman)) install.packages("pacman")
+
+pacman::p_load(
+  arrow,
+  tidymodels,
+  bonsai,
+  modeltime,
+  tidyverse,
+  stacks,
+  tictoc,
+  vetiver,
+  pins,
+  lubridate,
+  plumber,
+  openxlsx,
+  DALEX,
+  DALEXtra
+)
+
+tidymodels_prefer()
+options(scipen = 999)
+```
+
+
+## Load dataset
+
+```{r read-data, cache=TRUE}
+
+tbl <- read_parquet("../IbeseLivePosition/ml_data/ml_data.parquet", as_tibble = TRUE)
+
+```
+
+
+
+
+## Data Partitioning
+
+
+```{r data-split}
+
+
+set.seed(1234)
+trip_split <- initial_split(tbl,
+                            prop = 0.75,
+                            strata = "Duration")
+
+trip_train <- trip_split %>% 
+  training()
+
+trip_test <- trip_split %>% 
+  testing()
+```
+
+
+
+***
+
+
+
+# Ensembles of Models
+
+
+## Model Formula & Data preprocessing
+
+```{r recipe-wkflw}
+rec <- recipe(Duration ~ Day + Month + Hour + TimeOfDay + DistToPlant + DistCovered + TimeDiff + Altitude + Longitude + Latitude, data = trip_train)
+
+# Now add preprocessing steps to the recipe:
+
+trip_signed <- rec %>%
+  #step_log(all_outcomes(), base = 10) %>% 
+  step_impute_knn(all_predictors()) %>% 
+  step_normalize(all_numeric_predictors()) %>%
+  step_spatialsign(all_numeric_predictors()) %>% 
+  step_dummy(all_nominal_predictors()) %>%
+  step_other(all_nominal_predictors()) %>% 
+  step_filter_missing(all_nominal_predictors(), threshold = 0) %>% 
+  prep()
+ # step_zv(all_predictors(), skip = TRUE) %>% 
+ 
+
+trip_signed
+
+#trip_test_bake <- bake(trip_signed, new_data = trip_test)
+```
+***
+
+## Resampling
+
+```{r resampling}
+
+set.seed(1234)
+
+folds <- vfold_cv(trip_train, v = 5, strata = Duration)
+
+metric <- metric_set(mape, mase, smape, rsq)
+
+contrl_preds <- control_resamples(save_pred = TRUE, save_workflow = TRUE)
+
+cltr_grid <- control_stack_grid()
+cltr_res <- control_stack_resamples()
+
+```
+
+# Create Models Definition
+
+
+## Lightgbm Model Specification
+
+```{r lightgbm-model-spec}
+# Lightgbm model specification
+
+lightGBM_spec <- 
+  boost_tree(
+    mode = "regression",
+    mtry = tune("mtry"),
+    trees = tune("trees"),
+    min_n = tune("min_n"),
+    tree_depth = tune("tree_depth"),
+    learn_rate = tune("learn_rate"),
+    loss_reduction = tune("loss_reduction"),
+    sample_size = tune("sample_size")
+  ) %>% 
+  set_engine("lightgbm")
+
+
+lightGBM_wflow <- 
+  workflow() %>% 
+  add_model(lightGBM_spec) %>% 
+  add_recipe(trip_signed)
+
+lightGBM_wflow
+
+
+
+set.seed(1234)
+
+lightGBM_res <- 
+  tune_grid(
+    lightGBM_wflow,
+    resamples = folds,
+    metrics = metric,
+    grid = 4,
+    control = cltr_grid
+  )
+
+lightGBM_res
+```
+
+
+
+
+## KNN Model Specification
+
+```{r knn-model-spec}
+# knn model specification
+
+knn_spec <- 
+  nearest_neighbor(
+    mode = "regression",
+    neighbors = tune("k")
+  ) %>% 
+  set_engine("kknn")
+
+## knn specification
+
+knn_wflow <- 
+  workflow() %>% 
+  add_model(knn_spec) %>% 
+  add_recipe(trip_signed)
+
+knn_wflow
+
+
+
+set.seed(1234)
+
+knn_res <- 
+  tune_grid(
+    knn_wflow,
+    resamples = folds,
+    metrics = metric,
+    grid = 4,
+    control = cltr_grid
+  )
+
+knn_res
+```
+
+
+
+
+
+
+
+## Xgboost Model Specification
+
+```{r xgboost-model-spec}
+# xgboost model specification
+
+xgb_spec <- 
+  boost_tree(
+    mtry = tune("mtry"),
+    trees = tune("trees"),
+    min_n = tune("min_n"),
+    tree_depth = tune("tree_depth"),
+    learn_rate = tune("learn_rate"),
+    loss_reduction = tune("loss_reduction")
+  ) %>% 
+  set_engine("xgboost") %>% 
+  set_mode("regression") %>% 
+  translate()
+
+xgb_wflow <- 
+  workflow() %>% 
+  add_model(xgb_spec) %>% 
+  add_recipe(trip_signed)
+
+
+
+set.seed(1234)
+
+xgb_res <- 
+  tune_grid(
+    xgb_wflow,
+    resamples = folds,
+    grid = 6,
+    metrics = metric,
+    control = cltr_grid
+  )
+
+xgb_res
+```
+
+
+
+
+## Random Forest Model Specification
+
+
+```{r rf-model-spec}
+# Random Forest model specification
+
+rf_mod <- rand_forest(trees = tune(),
+                      min_n = tune()) %>% 
+  set_mode("regression") %>% 
+  set_engine("ranger", importance='impurity')
+
+## tune_rf_model
+
+
+rf_grid <- dials::parameters(rf_mod) %>% grid_random(size = 5)
+
+# setup workflow
+
+rf_trip_wflow <- workflow() %>% 
+  add_model(rf_mod) %>% 
+  add_recipe(trip_signed)
+
+rf_trip_wflow
+
+## hyper-parameter tuning with cross validation
+
+# train, test, and evaluate model performance
+
+set.seed(1234)
+
+rf_res <- 
+  rf_trip_wflow %>% 
+  tune_grid(resamples = folds,
+                grid = 6,
+                control = cltr_grid,
+                metrics = metric) 
+
+rf_res
+
+```
+
+# Stacking
+
+## Putting together a stack
+
+```{r stack-members}
+tic("start stack models")
+stacked_models <- 
+  stacks() %>% 
+  add_candidates(knn_res) %>% 
+  add_candidates(xgb_res) %>% 
+  add_candidates(rf_res) %>% 
+  add_candidates(lightGBM_res) 
+
+stacked_models %>% as_tibble()
+toc()
+```
+
+
+## Blend the stack
+
+```{r blend-stacks}
+tic("Fit the stack models")
+fit_stacked_models <- 
+  stacked_models %>% 
+  blend_predictions()
+toc()
+```
+
+## Plots
+
+```{r plots}
+theme_set(theme_bw())
+
+autoplot(fit_stacked_models)
+
+autoplot(fit_stacked_models, type = "members")
+
+
+```
+
+
+
+If these results were not good enough, `blend_predictions()` could be called again with different values of penalty. As it is, `blend_predictions()` picks the penalty parameter with the numerically optimal results. To see the top results:
+
+```{r autoplot}
+autoplot(fit_stacked_models, type = "weights")
+```
+
+
+Now that we know how to combine our model output, we can fit the candidates with non-zero stacking coefficients on the full training set.
+
+## Fit Stacked Models
+
+```{r fit-stacked}
+tic("fit the model members")
+fit_stacked_models<- 
+  fit_stacked_models %>% 
+  fit_members()
+toc()
+```
+
+
+To identify which model configurations were assigned what stacking coefficients, we can make use of the `collect_parameters()` function:
+
+
+```{r par-knn-res}
+collect_parameters(fit_stacked_models, "knn_res")
+```
+
+
+```{r par-xgb-res}
+collect_parameters(fit_stacked_models, "xgb_res")
+```
+
+
+```{r par-rf-res}
+collect_parameters(fit_stacked_models, "rf_res")
+```
+
+
+```{r}
+collect_parameters(fit_stacked_models, "rf_res")
+```
+
+## Predict with the Stacked Models
+
+This object is now ready to predict with new data!
+
+```{r predict-stacked-models}
+test_model <- 
+  trip_test %>% 
+  bind_cols(predict(fit_stacked_models, .))
+
+test_df <- test_model %>% 
+  mutate(Predicted = DateTimeReceived + seconds(.pred), .after = Arrival) %>%
+  select(TripID, Reference, Arrival, Predicted) %>% 
+  arrange(TripID, Reference, Arrival, Predicted) %>% 
+  group_by(TripID, Reference, Arrival) %>% 
+  slice_tail(n = 1) %>% 
+   ungroup() %>% 
+   mutate(Variance = paste0(round((as.numeric(Arrival - Predicted))/3600), " hrs"))
+
+test_df
+```
+
+```{r write-test-df, eval=FALSE, echo=FALSE}
+
+hs <- createStyle(
+  textDecoration = "BOLD", fontColour = "#FFFFFF", fontSize = 12,
+  fontName = "Arial Narrow", fgFill = "#4F80BD"
+)
+
+write.xlsx(test_df,
+           file = "Actual_vs_Prediction.xlsx",
+           colNames = TRUE, borders = "rows", headerStyle = hs
+)
+
+```
+
+
+
+Juxtaposing the predictions with the true data:
+
+```{r plot-predictions}
+ggplot(test_model) +
+  aes(x = Duration,
+      y = .pred) +
+  geom_point() +
+  coord_obs_pred()
+```
+
+
+How do the stacks predictions perform, though, as compared to the members’ predictions? We can use the `type = "members"` argument to generate predictions from each of the ensemble members.
+
+
+```{r compare-members}
+member_preds <- 
+  test_model %>% 
+  select(Duration) %>% 
+  bind_cols(predict(fit_stacked_models, test_model, members = TRUE)) %>% 
+  rename(stackedModels = `.pred`)
+
+member_preds
+```
+
+
+Now, evaluating the root mean squared error from each model:
+
+```{r rmse-comparison}
+map_dfr(member_preds, rmse, truth = Duration, data = member_preds) %>%
+  mutate(member = colnames(member_preds))
+```
+
+
+
+and the $r^2$ from each model:
+
+```{r rf-comparison}
+map_dfr(member_preds, rsq, truth = Duration, data = member_preds) %>%
+  mutate(member = colnames(member_preds))
+```
+
+
+
+# Model Versioning & Deployment
+
+
+```{r}
+class(fit_stacked_models)
+```
+
+```{r}
+fit_stacked_models
+```
+
+
+
+
+```{r vetiver-model, eval=TRUE}
+v <- vetiver_model(fit_stacked_models, "dcp_ibese_truck_arrival")
+v
+```
+
+
+```{r set-up-pins, eval=TRUE}
+model_board <- board_folder("pins-r", versioned = TRUE)
+model_board %>% vetiver_pin_write(v)
+model_board %>% pin_versions("dcp_ibese_truck_arrival")
+vetiver_write_plumber(model_board, "dcp_ibese_truck_arrival", rsconnect = FALSE)
+```
+
+## Create a REST API for deployment
+
+```{r eval=FALSE}
+pr() %>% 
+  vetiver_api(v) %>% 
+  pr_run(port = 9090)
+```
+
+
+## Predict from the model endpoint
+
+```{r eval=FALSE}
+endpoint <- vetiver_endpoint("http://127.0.0.1:9090/predict")
+```
+
+
+## Generate a Dockerfile
+
+```{r eval=FALSE}
+vetiver_write_docker(v)
+```
+
+
+# Session Information
+
+```{r session-info}
+sessionInfo()
+```
+
+# Variable Importance
+
+```{r explainer}
+
+explain_stack <- explain_tidymodels(fit_stacked_models, data = trip_test %>% select(-Duration, -TripID, -Reference, -Geofence, -DateTimeReceived, -Arrival), y = trip_test$Duration,
+                                    verbose = FALSE, label ="Stack Model")
+
+```
+
+
+
+
+```{r ggplot_imp_function}
+ggplot_imp <- function(...) {
+  obj <- list(...)
+  metric_name <- attr(obj[[1]], "loss_name")
+  metric_lab <- paste(metric_name, 
+                      "after permutations\n(higher indicates more important)")
+  
+  full_vip <- bind_rows(obj) %>%
+    filter(variable != "_baseline_")
+  
+  perm_vals <- full_vip %>% 
+    filter(variable == "_full_model_") %>% 
+    group_by(label) %>% 
+    summarise(dropout_loss = mean(dropout_loss))
+  
+  p <- full_vip %>%
+    filter(variable != "_full_model_") %>% 
+    mutate(variable = fct_reorder(variable, dropout_loss)) %>%
+    ggplot(aes(dropout_loss, variable)) 
+  if(length(obj) > 1) {
+    p <- p + 
+      facet_wrap(vars(label)) +
+      geom_vline(data = perm_vals, aes(xintercept = dropout_loss, color = label),
+                 size = 1.4, lty = 2, alpha = 0.7) +
+      geom_boxplot(aes(color = label, fill = label), alpha = 0.2)
+  } else {
+    p <- p + 
+      geom_vline(data = perm_vals, aes(xintercept = dropout_loss),
+                 size = 1.4, lty = 2, alpha = 0.7) +
+      geom_boxplot(fill = "#91CBD765", alpha = 0.4)
+    
+  }
+  p +
+    theme(legend.position = "none") +
+    labs(x = metric_lab, 
+         y = NULL,  fill = NULL,  color = NULL)
+}
+```
+
+
+
+```{r var-imp-plot, fig.cap="Global explainer for the stacked ensemble tidymodel on the trip data", fig.width = 9, fig.height=5}
+
+set.seed(1234)
+
+  explain_stack %>% 
+  model_parts() %>% 
+  ggplot_imp()
+
+```
+
+# Daily Prediction
+
+* Predict the arrival of inbound trucks that are yet to arrive within 24 hrs period.
+
+```{r predict-data-prep}
+
+trip_to_predict_tbl <- read_parquet("../IbeseLivePosition/ml_data/trips_to_predict.parquet", as_tibble = TRUE)
+```
+
+
+
+```{r predict-inbound-trucks}
+
+predict_df <- trip_to_predict_tbl %>% 
+  bind_cols(predict(fit_stacked_models, .)) %>% 
+  mutate(Predicted = DateTimeReceived + seconds(.pred), .after = Reference) %>%
+  select(TripID, Reference, Predicted) %>% 
+  group_by(TripID, Reference) %>% 
+  slice_tail(n = 1) %>% 
+  ungroup() %>% 
+  filter(as.Date(Predicted) == today()) %>% 
+  .[order(.$Predicted),]
+
+predict_df
+```
+
+
+
+
+```{r write-predict-df, eval=FALSE, echo=FALSE}
+
+hs <- createStyle(
+  textDecoration = "BOLD", fontColour = "#FFFFFF", fontSize = 12,
+  fontName = "Arial Narrow", fgFill = "#4F80BD"
+)
+
+write.xlsx(predict_df,
+           file = "Ibese Daily Inbound Trucks Arrival Prediction-0916.xlsx",
+           colNames = TRUE, borders = "rows", headerStyle = hs
+)
+
+```
+
+
+
+```{r prediction-vs-actual, eval=FALSE, echo=FALSE, include=FALSE}
+
+library(readxl)
+
+file <- read_excel("Ibese Daily Inbound Trucks Arrival Prediction-0916.xlsx")
+
+confirmation <- file %>% 
+  inner_join(Actual_tbl) %>% 
+  select(-Time) %>% 
+  mutate(Variance = round(difftime(Arrival, Predicted, units = "hours"),2))
+
+confirmation
+
+
+data_list <- list("prediction" = file,
+                  "confirmation" = confirmation)
+
+hs <- createStyle(
+  textDecoration = "BOLD", fontColour = "#FFFFFF", fontSize = 12,
+  fontName = "Arial Narrow", fgFill = "#4F80BD"
+)
+
+write.xlsx(data_list,
+           file = "Ibese Daily Inbound Trucks Arrival PredictionVSConfirmation-0916.xlsx",
+           colNames = TRUE, borders = "rows", headerStyle = hs,
+           asTable = TRUE, withFilter = TRUE
+)
+
+
+
+```
+

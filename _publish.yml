@@ -1,0 +1,8 @@
+- source: Transport_Analytics_TAT.Rmd
+  quarto-pub:
+    - id: e95fcc55-f145-4343-acec-40cf56202d63
+      url: 'https://quartopub.com/sites/iamolumide/dcp-transport-analytics'
+- source: Africa_R_MeetUp_Presentation.qmd
+  quarto-pub:
+    - id: fa0ddaef-83c4-4cb1-9b97-5fa355bbbf3c
+      url: 'https://quartopub.com/sites/iamolumide/essentials-of-data-wrangling-in-data-science-workflow'

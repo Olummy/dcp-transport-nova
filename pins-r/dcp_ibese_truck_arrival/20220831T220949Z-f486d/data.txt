@@ -1,0 +1,9 @@
+file: dcp_ibese_truck_arrival.rds
+file_size: 13433645
+pin_hash: f486d18f84ae547c
+type: rds
+title: 'dcp_ibese_truck_arrival: a pinned list'
+description: A regression stacked ensemble with 7 members
+created: 20220831T220949Z
+api_version: 1.0
+user: []

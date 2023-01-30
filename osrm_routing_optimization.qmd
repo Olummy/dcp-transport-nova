@@ -1,0 +1,257 @@
+---
+title: "Spatial Optimization with OSRM"
+author: "Olumide Oyalola"
+format: 
+  html:
+    code-fold: show
+    theme: journal
+    toc: true
+    toc-depth: 3
+    toc-title: Content
+    highlight-style: kate
+editor: visual
+---
+
+
+
+
+# Load the required packages
+
+
+
+```{r}
+
+if(!require("pacman")) install.packages("pacman")
+
+
+
+pacman::p_load(
+  httr,
+  jsonlite,
+  tidyjson,
+  tidyverse,
+  lubridate,
+  geosphere,
+  anytime,
+  tictoc,
+  stringi,
+  maptools,
+  geosphere,
+  sf,
+  sp,
+  openxlsx,
+  leaflet,
+  magrittr,
+  janitor,
+  arrow,
+  magrittr,
+  osrm,
+  leaflet
+)
+
+```
+
+
+# Load parquet files as tibble
+
+```{r}
+tic("Load the parquet files")
+
+df <- list.files("../IbeseLivePosition/data_parquet/",
+                 full.names = TRUE,
+                 include.dirs = TRUE) %>%
+  tail(., 300) %>% 
+  map_df(~read_parquet(., as_tibble = TRUE))
+
+toc()
+```
+
+
+
+
+
+
+# Data Wrangling
+
+```{r}
+remove <- c("/Date", "(", ")/", "[[:punct:]]")
+
+var <- c("ActualSpeed", "Address", "Altitude", "AssetClass", "AssetLocationID", "AssetStatus", "CategoryID", "CategoryName", "City", "CustomerName", "DateTimeLocal", "DateTimeReceived", "DeliveryOrderNumber", "DepartureDateTime", "DestinationArea", "DestinationCity", "DestinationSite", "DestinationStreet", "DeviceType", "DirectionString", "Distance", "DriverCode", "DriverID", "Geofence", "IgnitionStatus", "Information", "JourneyDistance", "JourneyDuration", "JourneyIdleTime", "JourneyMaxSpeed", "LastIgnitionOff", "LastIgnitionOn", "Latitude", "Load", "Longitude", "NumSatellites", "Odometer", "Reason", "ReasonString", "Reference", "Region", "SiteName", "SpeedOverGround", "Status", "Street", "TrackTrue", "TripDestination", "TripID", "TripSource", "TripType", "UTCDateTime", "WaybillNumber")
+
+
+
+df %<>% 
+  dplyr::select(all_of(var)) %>% 
+  mutate(DateTimeLocal = str_remove_all(DateTimeLocal, 
+                                        paste(remove, collapse = "|")),
+         DateTimeLocal = str_remove_all(DateTimeLocal, 
+                                        "\\+0100|\\+0000"),
+         DateTimeLocal = as.numeric(DateTimeLocal),
+         DateTimeLocal = DateTimeLocal/1000,
+         DateTimeLocal = anytime(DateTimeLocal),
+         DateTimeReceived = str_remove_all(DateTimeReceived, 
+                                           paste(remove, collapse = "|")),
+         DateTimeReceived = str_remove_all(DateTimeReceived, 
+                                           "\\+0100|\\+0000"),
+         DateTimeReceived = as.numeric(DateTimeReceived),
+         DateTimeReceived = DateTimeReceived/1000,
+         DateTimeReceived = anytime(DateTimeReceived),
+         DepartureDateTime = str_remove_all(DepartureDateTime, 
+                                            paste(remove, collapse = "|")),
+         DepartureDateTime = str_remove_all(DepartureDateTime, 
+                                            "\\+0100|\\+0000"),
+         DepartureDateTime = as.numeric(DepartureDateTime),
+         DepartureDateTime = DepartureDateTime/1000,
+         DepartureDateTime = anytime(DepartureDateTime),
+         UTCDateTime = str_remove_all(UTCDateTime, 
+                                      paste(remove, collapse = "|")),
+         UTCDateTime = str_remove_all(UTCDateTime, 
+                                      "\\+0100|\\+0000"),
+         UTCDateTime = as.numeric(UTCDateTime),
+         UTCDateTime = UTCDateTime/1000,
+         UTCDateTime = anytime(UTCDateTime),
+         LastIgnitionOff = str_remove_all(LastIgnitionOff, 
+                                          paste(remove, collapse = "|")),
+         LastIgnitionOff = str_remove_all(LastIgnitionOff, 
+                                          "\\+0100|\\+0000"),
+         LastIgnitionOff = as.numeric(LastIgnitionOff),
+         LastIgnitionOff = LastIgnitionOff/1000,
+         LastIgnitionOff = anytime(LastIgnitionOff),
+         LastIgnitionOn = str_remove_all(LastIgnitionOn, 
+                                         paste(remove, collapse = "|")),
+         LastIgnitionOn = str_remove_all(LastIgnitionOn, 
+                                         "\\+0100|\\+0000"),
+         LastIgnitionOn = as.numeric(LastIgnitionOn),
+         LastIgnitionOn = LastIgnitionOn/1000,
+         LastIgnitionOn = anytime(LastIgnitionOn)) %>% 
+  filter(!between(TripID, 9000000000, Inf)) %>% 
+  filter(!TripID == 0)
+
+df %<>% mutate(TripID = as.numeric(TripID))
+```
+
+
+
+```{r}
+
+options(scipen = 999)
+
+ibese_df <- data.frame(id = "ibese", lon = c(3.043568), lat = c(7.006293))
+
+
+ibese <- matrix(c(3.043568,7.006293), ncol = 2)
+
+ibese_geofence <- c("Ibese", "IBESE", "Vehicle Park", "Vehicle Park 2")
+
+
+inbound_df <- df %>% 
+  filter(AssetStatus == "InService", Longitude > 0, 
+         Latitude > 0) %>% 
+  filter(!between(TripID, 9000000000, Inf)) %>% 
+  filter(TripID != 0) %>% 
+  select(Reference, DateTimeReceived, 
+         Longitude, Latitude, TripID, Geofence, Altitude) %>% 
+  arrange(Reference, DateTimeReceived) %>% 
+  group_by(Reference, TripID) %>% 
+  mutate(.after = DateTimeReceived,
+         TimeDiff = as.numeric(difftime(DateTimeReceived, 
+                                        lag(DateTimeReceived, 
+                                            default = first(DateTimeReceived)), 
+                                        units = "hours")),
+         LongLat = matrix(c(Longitude, Latitude), ncol = 2),
+         DistCovered = distGeo(LongLat, lag(LongLat)),
+         DistCovered = DistCovered/1000,
+         DistToPlant = distGeo(LongLat, ibese),
+         DistToPlant = DistToPlant/1000) %>%
+  mutate(Direction = if_else(lag(DistToPlant) < DistToPlant, "Inbound", "Outbound")) %>% 
+  filter(Direction == "Inbound") %>% 
+  slice_tail(n = 1) %>% 
+  filter(TripID != 3000071349)
+
+```
+
+
+
+
+# Calculate the optimal trip
+
+```{r}
+
+inbound <- inbound_df %>% 
+  ungroup() %>% 
+  select(TripID, Longitude, Latitude) %>% 
+  rename(lon = Longitude,
+         lat = Latitude) %>% 
+  slice_head(n = 10)
+
+trips <- osrmTrip(inbound, osrm.profile = "car")
+```
+
+```{r}
+trip_sp <- trips[[1]]$trip
+
+# Plot with leaflet
+
+leaflet(data = trip_sp) %>% 
+  addTiles() %>% 
+  addMarkers(lng = inbound$lon, lat = inbound$lat, popup = inbound$TripID) %>% 
+  addPolylines()
+```
+
+
+
+
+duration <- osrmTable(src = inbound_df %>% ungroup() %>% 
+                        filter(as.Date(DateTimeReceived) == today()) %>% 
+                        select(TripID, Longitude, Latitude) %>% 
+                        slice_head(n = 100),
+                      dst = ibese_df, measure = "duration", osrm.profile = "car")
+
+
+***
+
+
+distance <- osrmTable(src = inbound_df %>% ungroup() %>% 
+                        filter(as.Date(DateTimeReceived) == today()) %>% 
+                        select(TripID, Longitude, Latitude) %>% 
+                        slice_head(n = 100),
+                      dst = ibese_df, measure = "distance", osrm.profile = "car")
+
+
+
+***
+
+distances <- distance$distances %>% 
+  as.data.frame() %>%
+  rownames_to_column() %>% 
+  rename(TripID = rowname,
+         Distance = ibese) %>% 
+  mutate(TripID = as.numeric(TripID))
+
+
+***
+
+
+durations <- duration$durations %>% 
+  as.data.frame() %>%
+  rownames_to_column() %>% 
+  rename(TripID = rowname,
+         duration = ibese) %>% 
+  mutate(TripID = as.numeric(TripID))
+
+
+***
+
+
+arrival <- inbound_df %>% ungroup() %>% 
+  inner_join(durations, by = 'TripID') %>% 
+  inner_join(distances, by = 'TripID') %>% 
+  mutate(Arrival = DateTimeReceived + minutes(round(duration))) %>% 
+  select(TripID, Reference, Longitude, Latitude, Distance, DateTimeReceived, Arrival) %>% 
+  arrange(Distance)
+
+***
+
+
+
+

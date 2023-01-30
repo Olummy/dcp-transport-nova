@@ -1,0 +1,273 @@
+---
+title: "Trips with zero TripIDs"
+subtitle: "Trips with zero TripIDs Statistical Analysis"
+author: "Olumide Oyalola"
+date: "`r Sys.Date()`"
+output: 
+  html_document: 
+    toc: yes
+    toc_float: yes
+    anchor_sections: yes
+    code_folding: show
+    code_download: yes
+    highlight: kate
+    theme: journal
+    number_sections: yes
+    fig_width: 9
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+
+# Packages
+
+```{r load-packages}
+# Install pacman package if needed
+if(!require("pacman")) install.packages("pacman")
+
+# load the required packages
+
+pacman::p_load(
+  httr,
+  jsonlite,
+  tidyjson,
+  tidyverse,
+  lubridate,
+  geosphere,
+  anytime,
+  tictoc,
+  stringi,
+  maptools,
+  geosphere,
+  sf,
+  sp,
+  openxlsx,
+  leaflet,
+  magrittr,
+  janitor,
+  collapse,
+  DT
+)
+```
+
+# Load Data
+
+```{r load-data}
+trpID_is_zero <- read_rds("tripIDisZero.RDS")
+```
+
+
+
+
+# Summary
+
+* Two weeks long hourly data starting from `2022-06-10 08:00:08` to `2022-06-25 00:00:15`. The API was pinged hourly within the closed timestamp above. All trips with TripIDs equal zero were filtered and analyzed. The analysis is as detailed in the subsections below.
+
+* Below are the insights derived from the filtered data (Trips with `TripIDs` equal zero within the stated timestamp above).
+
+  1. 452,229 out of 1,001,595 is the total number of live position data corresponding to trips with `TripID` equal zero. This corresponds to 45% of the live position data captured within the time frame having `TripID` equal zero.
+  
+  2. Trips within this period have 194 unique `Geofences`. Below are samples of the distinct `Geofences`.
+  
+  `r trpID_is_zero %>% 
+    pull(Geofence) %>% 
+    unique() %>% 
+    .[160:194]`
+    
+  
+  3. `HGV`, `FuelTanker` and `MixerTruck` are the top 3 assets with no TripID.
+  
+  4. * Within the two weeks time window, No `InService` truck within the Ibese geofences (Ibese plant geofence and several other geofences within it) has zero `TripID`.
+
+
+
+# Analysis
+
+
+
+## Data Description
+
+* Summary of the `numeric` and `character` type variables.
+
+```{r describe-data, comment=""}
+
+trpID_is_zero %>% 
+select_if(function(col) is.numeric(col) | 
+                        is.character(col)) %>% 
+descr() 
+
+```
+
+
+```{r assetClass}
+trpID_is_zero %>%
+  mutate(AssetName = case_when(AssetClass == 0 ~ "Car",
+                               AssetClass == 1 ~ "Van",
+                               AssetClass == 2 ~ "HGV",
+                               AssetClass == 3 ~ "PSV",
+                               AssetClass == 4 ~ "Motor_Cycle",
+                               AssetClass == 5 ~ "Ambulance",
+                               AssetClass == 6 ~ "_4X4",
+                               AssetClass == 7 ~ "Container",
+                               AssetClass == 8 ~ "Trailer",
+                               AssetClass == 9 ~ "Crane",
+                               AssetClass == 10 ~ "Dump_Truck",
+                               AssetClass == 11 ~ "Fire_Engine",
+                               AssetClass == 12 ~ "Train",
+                               AssetClass == 13 ~ "Mini_Bus",
+                               AssetClass == 14 ~ "Helicopter",
+                               AssetClass == 15 ~ "Plane",
+                               AssetClass == 16 ~ "Police_Car",
+                               AssetClass == 17 ~ "Trawler",
+                               AssetClass == 18 ~ "camper",
+                               AssetClass == 19 ~ "Speed_Boat",
+                               AssetClass == 20 ~ "Ship",
+                               AssetClass == 21 ~ "Farm_Vehicle",
+                               AssetClass == 22 ~ "Generator",
+                               AssetClass == 23 ~ "Mobile_Tower",
+                               AssetClass == 24 ~ "Taxi",
+                               AssetClass == 25 ~ "Dog",
+                               AssetClass == 26 ~ "Cat",
+                               AssetClass == 27 ~ "Pet_Other",
+                               AssetClass == 28 ~ "Human",
+                               AssetClass == 29 ~ "Other_Vehicle",
+                               AssetClass == 30 ~ "Custom_Image",
+                               AssetClass == 31 ~ "Forklift",
+                               AssetClass == 32 ~ "Construction_Equipment",
+                               AssetClass == 33 ~ "Bicycle",
+                               AssetClass == 34 ~ "CementTruck",
+                               AssetClass == 35 ~ "CoalTruck",
+                               AssetClass == 36 ~ "RecoveryTruck",
+                               AssetClass == 37 ~ "TruckMountedCrane",
+                               AssetClass == 38 ~ "TowTruck",
+                               AssetClass == 39 ~ "FuelTanker",
+                               AssetClass == 40 ~ "MixerTruck",
+                               AssetClass == 41 ~ "QuadBike",
+                               AssetClass == 42 ~ "Truck",
+                               AssetClass == 43 ~ "IOT",
+                               AssetClass == 44 ~ "Truck_Head",
+                               AssetClass == 45 ~ "Backhoe_Loader",
+                               AssetClass == 46 ~ "Dozer",
+                               AssetClass == 47 ~ "Excavator",
+                               AssetClass == 48 ~ "Motor_Grader",
+                               AssetClass == 49 ~ "Polaris_Ranger",
+                               AssetClass == 50 ~ "Sheep_Foot_Roller",
+                               AssetClass == 51 ~ "Vibratory_Roller",
+                               AssetClass == 52 ~ "Wheel_Loader")) %>% 
+  count(AssetClass, AssetName) %>% 
+  arrange(n) %>% 
+  rename(Frequency = n) %>% 
+  datatable(caption = "Distribution of Trips with zero tripIDs by AssetClass") %>% 
+  formatRound(columns = c('Frequency'), digits = 0)
+```
+
+## Cement Trucks outside of Ibese Geofence with no TripIDs
+
+```{r}
+
+ibese_geofence <- c("Ibese", "IBESE")
+
+
+trpID_is_zero %>% 
+  mutate(Geofence = case_when(Geofence == "" ~ "NA",
+                              TRUE ~ Geofence)) %>% 
+  filter(!str_detect(Geofence, paste(ibese_geofence, collapse = "|"))) %>% 
+  filter(AssetClass == 34) %>% 
+  count(Reference, Geofence) %>% 
+  rename(Count = n) %>% 
+  datatable(caption = "Cement Trucks outside of Ibese Geofence with no TripIDs") %>% 
+  formatRound(columns = c('Count'), digits = 0)
+```
+
+# Efficiency of Utilization
+
+* Average time it takes before an operational truck is assigned to a trip
+
+```{r read-wks-all-livePosition-data}
+two_wks_all_position_tbl <- read_rds("2wks-All-LivePosition.RDS")
+```
+
+
+
+```{r}
+geo_proj = "+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0"
+
+
+position <- two_wks_all_position_tbl %$% 
+  matrix(c(Longitude, Latitude), ncol = 2)
+
+position_sf <- SpatialPoints(position, 
+                              proj4string=CRS(geo_proj)) %>% 
+   st_as_sf()
+ 
+plant <- matrix(c(3.05120587348938, 7.00300851960855), ncol = 2)
+
+ibese_sp <- SpatialPoints(plant, proj4string=CRS(geo_proj)) %>% 
+  st_as_sf()
+
+plant_buffer <- st_buffer(ibese_sp, 5000)
+
+ 
+row_id <- st_intersects(plant_buffer, position_sf)[[1]]
+ 
+check_df <- two_wks_all_position_tbl[row_id,]
+
+#inservice - tripid == 0; the tripid changes from zero
+# the truck is expected to be within the geofence of the plant.
+# use 2km buffer
+# the time elapse from when the tripID=0 to when it turned to another value except zero.
+
+
+
+
+```
+
+
+## Cement trucks Utilization efficiency check
+
+```{r efficiency}
+
+check_df %>% 
+  filter(AssetStatus == "InService", AssetStatus %in% c(34, 42)) %>% 
+  select(DateTimeLocal, Reference, TripID, Geofence, AssetClass) %>% 
+  arrange(DateTimeLocal, Reference, AssetClass, TripID) %>% 
+  group_by(Reference, AssetClass, TripID) %>% 
+  slice(c(1, n())) %>% 
+  mutate(`Delay (Hrs)` = case_when((TripID == 0 & lag(TripID) == 0) | (TripID == 0 & lag(TripID != 0)) ~ as.numeric(difftime(DateTimeLocal, 
+                                        lag(DateTimeLocal, 
+                                            default = first(DateTimeLocal)), 
+                                        units = "hours")))) %>% 
+  filter(!is.na(`Delay (Hrs)`)) %>% 
+  datatable(caption = "Cement trucks Utilization efficiency check") %>% 
+  formatRound(columns = c('Delay (Hrs)'), digits = 0)
+  
+
+```
+
+* Within the two weeks time window, No `InService` truck within the Ibese geofences (Ibese plant geofence and several other geofences within it) has zero `TripID`.
+
+
+
+## Other `assetclass` utilization efficiency check
+
+```{r efficiency2}
+
+check_df %>% 
+  filter(AssetStatus == "InService", !AssetStatus %in% c(34, 42)) %>% 
+  select(DateTimeLocal, Reference, TripID, Geofence, AssetClass) %>% 
+  arrange(DateTimeLocal, Reference, AssetClass, TripID) %>% 
+  group_by(Reference, AssetClass, TripID) %>% 
+  slice(c(1, n())) %>% 
+  mutate(`Delay (Hrs)` = case_when((TripID == 0 & lag(TripID) == 0) | (TripID == 0 & lag(TripID != 0)) ~ as.numeric(difftime(DateTimeLocal, 
+                                        lag(DateTimeLocal, 
+                                            default = first(DateTimeLocal)), 
+                                        units = "hours")))) %>% 
+  filter(!is.na(`Delay (Hrs)`)) %>% 
+  datatable(caption = "Other assetclass utilization efficiency check") %>% 
+  formatRound(columns = c('Delay (Hrs)'), digits = 0)
+  
+
+```
+

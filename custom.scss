@@ -1,0 +1,58 @@
+/*-- scss:defaults --*/
+
+// fonts
+$font-family-sans-serif: "Palatino Linotype", "Book Antiqua", Palatino,
+  FreeSerif, serif, 'Open Sans', sans-serif !default;
+$font-family-monospace: 'Fira Mono', monospace;
+
+// colors
+$body-bg: #FFFFFF !default;
+$body-color: #000 !default;
+$link-color: #EE6331 !default;
+$selection-bg: #26351c !default;
+
+
+// headings
+$presentation-heading-font: "Palatino Linotype", "Book Antiqua", Palatino,
+  FreeSerif, serif !default;
+$presentation-heading-color: #000080 !default;
+$presentation-heading-line-height: 1.5;
+
+/*-- scss:rules --*/
+
+.reveal a {
+  line-height: 1.5em;
+}
+
+h2 {
+  color:#447099 !important;
+}
+
+
+
+// code block
+
+$code-block-bg: #ded9ca;
+$code-block-border-color: #000000;
+$code-block-font-size: 0.6em;
+$dark-bg-code-color: #000000;
+$dark-bg-text-color: #FFFFFF;
+$code-bg: #000000 !default;
+
+// Presentation
+
+$presentation-title-slide-text-align: left;
+$link-color-hover: #FFFFFF;
+
+.sectionhead{
+  font-size: 1em;
+  text-align: center;
+  color: $presentation-heading-color;
+  font-family: $presentation-heading-font;
+  background-color: $body-bg;
+  margin: 1px;
+  padding: 2px 2px 2px 2px;
+  width: 120px;
+  border-left: 10px solid;
+}
+

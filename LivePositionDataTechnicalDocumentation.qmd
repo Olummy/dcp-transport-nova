@@ -1,0 +1,117 @@
+---
+title: "Live Position Data Technical Documentation"
+author: "Dangote Industries Limited | Corporate Strategy"
+pdf-engine: lualatex
+format: 
+  pdf:
+    toc: true
+    documentclass: scrreprt
+    logo: images/dangote.jpg
+    toccolor: "red"
+    toc-depth: 3
+    toc-title: "Content"
+    code-overflow: wrap
+    code-copy: true
+    code-link: true
+    highlight-style: atom-one-dark
+    number-sections: true
+editor: visual
+---
+
+| Metadata       | Values                                     |
+|----------------|--------------------------------------------|
+| Document Title | Live Position Data Technical Documentation |
+| Author         | Olumide Oyalola                            |
+| Reviewer       | Aliyu Suleiman                             |
+| Version        | 1.0                                        |
+| Date           | August, 2022                               |
+
+: Document Metadata
+
+\newpage
+
+# Purpose
+
+This piece of document is expected to serve the purpose of onboarding a team member and provide visibility for other team members.
+
+# Introduction
+
+This document contains the communications protocol for the truck live position data from NOVATRACK via REST API.
+
+## Architecture
+
+![](images/data_sourcing.png){width="450"}
+
+## API End Point
+
+Here's the API endpoint for the live position data stream.
+
+```{default}
+
+http://46.20.238.167/DataProvider_new/api/v1/vehicle/livepositions
+```
+
+The API requires bearer-token authentication which can be obtained from the credentials (username and password) used to access the NOVATRACK desktop application. The user can use postman to get the bearer-token authentication.
+
+## Authentication
+
+The user should be authenticated via a login request to be able to send requests and get responses. The following points show the authentication process steps:
+
+-   Send *username*, *password*, *fcmToken*, *and* *application* *and* *appVersion* via a secure channel (TLS).
+
+-   The server checks and validates credentials. Then generates the authentication token (*auth*-*token) returned in the response.*
+
+-   The application must send the *auth token with any further request in the HTTP header as follows:*
+
+***Authorization*****: *Bearercb68b9e7-47ba-48d2-affc-ccd6dcba1ed4***
+
+-   You should re-login whenever you receive the HTTP error code 401 because the authentication token has expired. As a result, you should invalidate the local database.
+
+## Python Script
+
+Below is the python script used to obtain the data from the API and save the resulting data object as a parquet file. The choice of parquet over JSON and CSV is because of the speeding of loading the files and the file size. With parquet, we will surely gain tremendously on the disk space usage and time to load each file for analysis.
+
+```{python}
+#| eval: false
+#| warning: false
+#| message: false
+#| error: false
+
+# load modules
+from dotenv import load_dotenv
+import requests
+import json
+import datetime as dt
+import os
+import pandas as pd
+load_dotenv()
+
+# read token from env file
+token = os.environ.get('token')
+
+# setup bearer token
+bearerToken = str('Bearer' + ' ' + '{' + token + '}')
+
+# header authentication
+my_headers = {'Authorization' : bearerToken}
+
+# post request
+response = requests.post('http://46.20.238.167/DataProvider_new/api/v1/vehicle/livepositions',
+headers=my_headers)
+
+# save response body as an object - data
+data = response.json()
+
+if data["message"] == "operation completed successfully":
+    # get the datetime object
+    ct = dt.datetime.now().strftime('%Y-%m-%d %H-%M-%d-%f')
+    # file name
+    name = str('livePosition-' + ct)
+    # file path
+    path = ".\data_parquet"
+    filepath = os.path.join(path, "")
+    # file full path
+    filename = str(filepath + name + ".parquet")
+    df = pd.DataFrame(data.get('result'))
+    df.to_parquet(filename)
+```
